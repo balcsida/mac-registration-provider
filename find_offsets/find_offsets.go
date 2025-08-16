@@ -45,6 +45,22 @@ var (
 			"NACSignAddress":             "7f2303d5fc6fbaa9fa6701a9f85f02a9f65703a9f44f04a9fd7b05a9fd430191ff....d1................08....f9......................................................................................................................................f2......f2......................d2",
 		},
 	}
+
+	// Updated patterns for macOS 15.6+ based on actual function signatures
+	HexStringsSequoia = HexStrings{
+		"x86_64": {
+			"ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)": "554889e54157415641554154534883ec28..89..48897dd04c8b3d",
+			"NACInitAddress (copyRegistrationKeyPairForIdentifier)":             "554889e5535048..cb4c89c04889d74c8b45104c8b4d184c8d55f0",
+			"NACKeyEstablishmentAddress (copyPublicIdentityDataToRegister)":     "554889e54157415641545348..cb41..d64989ff488b7f08488b35",
+			"NACSignAddress (copyKTRegistrationDataToRegister)":                 "554889e54157415641554154534883ec1841..d64889fb488b7f08488b35",
+		},
+		"arm64e": {
+			"ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)": "7f2303d5ffc301d1fc6f01a9fa6702a9f85f03a9f65704a9f44f05a9fd7b06a9fd830191f30301aa",
+			"NACInitAddress (copyRegistrationKeyPairForIdentifier)":             "7f2303d5ffc300d1f44f01a9fd7b02a9fd830091f30305aa",
+			"NACKeyEstablishmentAddress (copyPublicIdentityDataToRegister)":     "7f2303d5f657bda9f44f01a9fd7b02a9fd830091f30303aa",
+			"NACSignAddress (copyKTRegistrationDataToRegister)":                 "7f2303d5ff0301d1f65701a9f44f02a9fd7b03a9fdc30091f40302aa",
+		},
+	}
 )
 
 func PrintOffsets(filePath string) {
@@ -71,6 +87,11 @@ func PrintOffsets(filePath string) {
 
 	searchResults := SearchInArchitectures(filePath, architectures, HexStringsModern)
 	printSearchResults(searchResults, architectures, " (with pure Go fixed sequence search + regex)")
+
+	fmt.Println("")
+
+	sequoiaResults := SearchInArchitectures(filePath, architectures, HexStringsSequoia)
+	printSearchResults(sequoiaResults, architectures, " (macOS 15.6+ Sequoia patterns)")
 }
 
 func ScanMachOFATBinary(filePath string) (map[int]Architecture, error) {
