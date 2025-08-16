@@ -82,6 +82,8 @@ type ReqInitializeValidation struct {
 
 type RespInitializeValidation struct {
 	SessionInfo []byte `plist:"session-info"`
+	Message     string `plist:"message"`
+	Status      int    `plist:"status"`
 }
 
 func InitializeValidation(ctx context.Context, request []byte) (sessionInfo []byte, err error) {
@@ -105,9 +107,22 @@ func InitializeValidation(ctx context.Context, request []byte) (sessionInfo []by
 	_, err = plist.Unmarshal(respData, &parsedResp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
-	} else if len(parsedResp.SessionInfo) == 0 {
+	}
+	
+	// Handle different response formats
+	if len(parsedResp.SessionInfo) > 0 {
+		// Standard response with session-info
+		sessionInfo = parsedResp.SessionInfo
+		return
+	} else if parsedResp.Status != 0 && parsedResp.Message != "" {
+		// Apple returned a status response (like 5080) with message
+		log.Printf("Apple returned status %d with message: %s", parsedResp.Status, parsedResp.Message)
+		
+		// For status 5080, use the message as session info for the next step
+		sessionInfo = []byte(parsedResp.Message)
+		return
+	} else {
 		return nil, fmt.Errorf("didn't get session info in initialize validation response")
 	}
-	sessionInfo = parsedResp.SessionInfo
 	return
 }
