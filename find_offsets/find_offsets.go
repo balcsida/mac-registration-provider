@@ -50,7 +50,7 @@ var (
 	HexStringsSequoia = HexStrings{
 		"x86_64": {
 			"ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)": "554889e54157415641554154534883ec28..89..48897dd04c8b3d",
-			"NACInitAddress (copyRegistrationKeyPairForIdentifier)":             "554889e5535048..cb4c89c04889d74c8b45104c8b4d184c8d55f0",
+			"NACInitAddress (copyRegistrationKeyPairForIdentifier)":             "554889e5535048..cb4c89c04889d74c8b45104c8b4d184c8d55f049c702000000",
 			"NACKeyEstablishmentAddress (copyPublicIdentityDataToRegister)":     "554889e54157415641545348..cb41..d64989ff488b7f08488b35",
 			"NACSignAddress (copyKTRegistrationDataToRegister)":                 "554889e54157415641554154534883ec1841..d64889fb488b7f08488b35",
 		},

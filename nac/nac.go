@@ -143,22 +143,52 @@ func FindOffsets(filePath string) (imdOffsetTuple, error) {
 		return imdOffsetTuple{}, err
 	}
 
-	searchResults := find_offsets.SearchInArchitectures(filePath, architectures, find_offsets.HexStringsModern)
-	offsets := imdOffsetTuple{
-		x86: imdOffsets{
-			ReferenceSymbol:            symbol,
-			ReferenceAddress:           searchResults[0]["ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)"][0],
-			NACInitAddress:             searchResults[0]["NACInitAddress"][0],
-			NACKeyEstablishmentAddress: searchResults[0]["NACKeyEstablishmentAddress"][0],
-			NACSignAddress:             searchResults[0]["NACSignAddress"][0],
-		},
-		arm64: imdOffsets{
-			ReferenceSymbol:            symbol,
-			ReferenceAddress:           searchResults[1]["ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)"][0],
-			NACInitAddress:             searchResults[1]["NACInitAddress"][0],
-			NACKeyEstablishmentAddress: searchResults[1]["NACKeyEstablishmentAddress"][0],
-			NACSignAddress:             searchResults[1]["NACSignAddress"][0],
-		},
+	// For macOS 15.6+, use Sequoia patterns since the functions are different
+	var searchResults map[int]map[string][]int
+	if isSequoia() {
+		searchResults = find_offsets.SearchInArchitectures(filePath, architectures, find_offsets.HexStringsSequoia)
+	} else {
+		searchResults = find_offsets.SearchInArchitectures(filePath, architectures, find_offsets.HexStringsModern)
+	}
+	
+	var offsets imdOffsetTuple
+	
+	if isSequoia() {
+		// Sequoia uses different field names in the search results
+		offsets = imdOffsetTuple{
+			x86: imdOffsets{
+				ReferenceSymbol:            symbol,
+				ReferenceAddress:           searchResults[0]["ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)"][0],
+				NACInitAddress:             searchResults[0]["NACInitAddress (copyRegistrationKeyPairForIdentifier)"][0],
+				NACKeyEstablishmentAddress: searchResults[0]["NACKeyEstablishmentAddress (copyPublicIdentityDataToRegister)"][0],
+				NACSignAddress:             searchResults[0]["NACSignAddress (copyKTRegistrationDataToRegister)"][0],
+			},
+			arm64: imdOffsets{
+				ReferenceSymbol:            symbol,
+				ReferenceAddress:           searchResults[1]["ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)"][0],
+				NACInitAddress:             searchResults[1]["NACInitAddress (copyRegistrationKeyPairForIdentifier)"][0],
+				NACKeyEstablishmentAddress: searchResults[1]["NACKeyEstablishmentAddress (copyPublicIdentityDataToRegister)"][0],
+				NACSignAddress:             searchResults[1]["NACSignAddress (copyKTRegistrationDataToRegister)"][0],
+			},
+		}
+	} else {
+		// Legacy patterns use the original field names
+		offsets = imdOffsetTuple{
+			x86: imdOffsets{
+				ReferenceSymbol:            symbol,
+				ReferenceAddress:           searchResults[0]["ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)"][0],
+				NACInitAddress:             searchResults[0]["NACInitAddress"][0],
+				NACKeyEstablishmentAddress: searchResults[0]["NACKeyEstablishmentAddress"][0],
+				NACSignAddress:             searchResults[0]["NACSignAddress"][0],
+			},
+			arm64: imdOffsets{
+				ReferenceSymbol:            symbol,
+				ReferenceAddress:           searchResults[1]["ReferenceAddress (_IDSProtoKeyTransparencyTrustedServiceReadFrom)"][0],
+				NACInitAddress:             searchResults[1]["NACInitAddress"][0],
+				NACKeyEstablishmentAddress: searchResults[1]["NACKeyEstablishmentAddress"][0],
+				NACSignAddress:             searchResults[1]["NACSignAddress"][0],
+			},
+		}
 	}
 
 	return offsets, nil
