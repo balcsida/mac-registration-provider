@@ -54,6 +54,10 @@ func Load() error {
 	if err != nil {
 		return err
 	}
+	return LoadWithHash(hash)
+}
+
+func LoadWithHash(hash [32]byte) error {
 	var offs imdOffsets
 	if runtime.GOARCH == "arm64" {
 		offs = offsets[hash].arm64

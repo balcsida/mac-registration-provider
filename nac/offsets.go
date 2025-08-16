@@ -250,6 +250,16 @@ var offsets_14_6_b1 = imdOffsetTuple{
 	},
 }
 
+var offsets_15_6 = imdOffsetTuple{
+	arm64: imdOffsets{
+		ReferenceSymbol:            "IDSProtoKeyTransparencyTrustedServiceReadFrom",
+		ReferenceAddress:           0x0d6588,
+		NACInitAddress:             0x4c1acc,
+		NACKeyEstablishmentAddress: 0x65baa0,
+		NACSignAddress:             0x48953c,
+	},
+}
+
 // offsets is a map from sha256 hash of identityservicesd to the function pointer offsets in that binary.
 var offsets = map[[32]byte]imdOffsetTuple{
 	// macOS 10.13.6
@@ -306,6 +316,8 @@ var offsets = map[[32]byte]imdOffsetTuple{
 	hexToByte32("482839377ea4780e90252aa48763800d90f272a3ba19b9ff6752ef9d7620df26"): offsets_14_5,
 	// macOS 14.6 Beta 1
 	hexToByte32("8eb0048ced3801d71a89495dcab198f038cd35c378ee059c52264c7b4107daa1"): offsets_14_6_b1,
+	// macOS 15.6
+	hexToByte32("49d567b7bf44407e738e9917872671f615bad354090514d0d7d02ed577cfcac8"): offsets_15_6,
 }
 
 type imdOffsetTuple struct {
@@ -329,4 +341,37 @@ func hexToByte32(val string) [32]byte {
 		panic(fmt.Errorf("expected 32 bytes, got %d", len(out)))
 	}
 	return *(*[32]byte)(out)
+}
+
+// Testing helpers - exported for bruteforce testing
+type ImdOffsets = imdOffsets
+type ImdOffsetTuple = imdOffsetTuple
+
+func GetOffsets() map[[32]byte]imdOffsetTuple {
+	return offsets
+}
+
+func SetOffsets(hash [32]byte, offs imdOffsetTuple) {
+	offsets[hash] = offs
+}
+
+func ClearOffsets() {
+	offsets = make(map[[32]byte]imdOffsetTuple)
+}
+
+func CreateOffsetTuple(x86Offs, arm64Offs imdOffsets) imdOffsetTuple {
+	return imdOffsetTuple{
+		x86:   x86Offs,
+		arm64: arm64Offs,
+	}
+}
+
+func CreateOffsets(refSym string, refAddr, initAddr, keyAddr, signAddr int) imdOffsets {
+	return imdOffsets{
+		ReferenceSymbol:            refSym,
+		ReferenceAddress:           refAddr,
+		NACInitAddress:             initAddr,
+		NACKeyEstablishmentAddress: keyAddr,
+		NACSignAddress:             signAddr,
+	}
 }
