@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <Security/Security.h>
 #include <CommonCrypto/CommonDigest.h>
+#include <IOKit/IOKitLib.h>
 
 // Legacy function pointer approach for older macOS versions
 int nacInitProxy(void *addr, const void *cert_bytes, int cert_len, void **out_validation_ctx, void **out_request_bytes, int *out_request_len);

@@ -3,7 +3,7 @@ package nac
 // TODO Should this use -fobjc-arc to enable automatic reference counting instead of NSAutoreleasePool?
 
 //#cgo CFLAGS: -x objective-c -Wno-deprecated-declarations -Wno-incompatible-pointer-types
-//#cgo LDFLAGS: -framework Foundation -framework IOKit
+//#cgo LDFLAGS: -framework Foundation -framework IOKit -framework Security
 //#include "nac.h"
 //#include <dlfcn.h>
 import "C"

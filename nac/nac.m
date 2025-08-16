@@ -95,14 +95,40 @@ int nacSequoiaInitProxy(void *cert_bytes, int cert_len, void **out_validation_ct
         
         NSLog(@"Got keyPairProvider: %@", keyPairProvider);
         
-        // Step 2: Generate a device-specific identifier from the certificate
+        // Step 2: Use proper device identifier format that matches Apple's expectations
         NSData *certData = [NSData dataWithBytes:cert_bytes length:cert_len];
         
-        // Create a unique identifier from the certificate hash
-        uint8_t hash[32];
-        CC_SHA256(cert_bytes, cert_len, hash);
-        NSString *deviceIdentifier = [[NSString alloc] initWithFormat:@"sequoia-device-%02x%02x%02x%02x", 
-                                      hash[0], hash[1], hash[2], hash[3]];
+        // Try to get the actual device UDID or use a system-appropriate identifier
+        // On real Macs, this should match the format used by identityservicesd
+        NSString *deviceUDID = [[[NSProcessInfo processInfo] environment] objectForKey:@"SIMULATOR_UDID"];
+        if (!deviceUDID) {
+            // For real Macs, try to get the hardware UUID
+            io_registry_entry_t ioRegistryRoot = IORegistryEntryFromPath(kIOMasterPortDefault, "IOService:/");
+            CFStringRef uuidCf = (CFStringRef) IORegistryEntryCreateCFProperty(ioRegistryRoot, 
+                                                                              CFSTR(kIOPlatformUUIDKey), 
+                                                                              kCFAllocatorDefault, 0);
+            if (uuidCf) {
+                deviceUDID = (NSString *)CFBridgingRelease(uuidCf);
+                IOObjectRelease(ioRegistryRoot);
+            }
+        }
+        
+        // If we still don't have a UDID, fall back to a system-derived identifier
+        if (!deviceUDID) {
+            // Use the certificate hash to create a consistent identifier
+            uint8_t hash[32];
+            CC_SHA256(cert_bytes, cert_len, hash);
+            deviceUDID = [[NSString alloc] initWithFormat:@"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+                         hash[0], hash[1], hash[2], hash[3],
+                         hash[4], hash[5], hash[6], hash[7],
+                         hash[8], hash[9], hash[10], hash[11],
+                         hash[12], hash[13], hash[14], hash[15]];
+        }
+        
+        // Use application key index 1 (not 0) to match the system's expectation
+        NSString *deviceIdentifier = [NSString stringWithFormat:@"%@:1", deviceUDID];
+        
+        NSLog(@"Using device identifier: %@", deviceIdentifier);
         
         // Step 3: Try to get existing keys first, fall back to generating our own
         SecKeyRef publicKey = NULL;
@@ -172,47 +198,41 @@ int nacSequoiaInitProxy(void *cert_bytes, int cert_len, void **out_validation_ct
             }
         }
         
-        // Step 5: Create the NAC registration request in the format expected by Apple
-        // This should be similar to what the original NAC functions would generate
+        // Step 5: Create the NAC registration request in Apple's expected binary format
+        // Based on Ghidra analysis, this should match the original NAC function output
         NSMutableData *nacRequest = [NSMutableData data];
         
-        // Add protocol header
-        uint8_t header[] = {0x30, 0x82}; // ASN.1 SEQUENCE, long form length
-        [nacRequest appendBytes:header length:sizeof(header)];
+        // NAC request appears to be a simple concatenated binary format, not ASN.1
+        // Start with a NAC protocol identifier
+        uint8_t nacHeader[] = {0x4E, 0x41, 0x43, 0x01}; // "NAC" + version
+        [nacRequest appendBytes:nacHeader length:sizeof(nacHeader)];
         
-        // Length placeholder (will be filled later)
-        uint16_t lengthPlaceholder = 0;
-        NSUInteger lengthOffset = nacRequest.length;
-        [nacRequest appendBytes:&lengthPlaceholder length:sizeof(lengthPlaceholder)];
-        
-        // Add certificate data
-        uint8_t certHeader[] = {0x04}; // OCTET STRING
-        [nacRequest appendBytes:certHeader length:sizeof(certHeader)];
-        uint8_t certLen = (uint8_t)cert_len;
-        [nacRequest appendBytes:&certLen length:sizeof(certLen)];
+        // Add certificate length and data
+        uint32_t certLength = htonl((uint32_t)cert_len);
+        [nacRequest appendBytes:&certLength length:sizeof(certLength)];
         [nacRequest appendBytes:cert_bytes length:cert_len];
+        
+        // Add device identifier length and data
+        NSData *deviceIdData = [deviceIdentifier dataUsingEncoding:NSUTF8StringEncoding];
+        uint32_t deviceIdLength = htonl((uint32_t)deviceIdData.length);
+        [nacRequest appendBytes:&deviceIdLength length:sizeof(deviceIdLength)];
+        [nacRequest appendData:deviceIdData];
         
         // Add public key data if available
         if (publicKeyData) {
-            uint8_t keyHeader[] = {0x04}; // OCTET STRING
-            [nacRequest appendBytes:keyHeader length:sizeof(keyHeader)];
-            uint8_t keyLen = (uint8_t)publicKeyData.length;
-            [nacRequest appendBytes:&keyLen length:sizeof(keyLen)];
+            uint32_t keyLength = htonl((uint32_t)publicKeyData.length);
+            [nacRequest appendBytes:&keyLength length:sizeof(keyLength)];
             [nacRequest appendData:publicKeyData];
+        } else {
+            // Add zero length for missing key data
+            uint32_t zeroLength = 0;
+            [nacRequest appendBytes:&zeroLength length:sizeof(zeroLength)];
         }
         
-        // Add device identifier
-        NSData *deviceIdData = [deviceIdentifier dataUsingEncoding:NSUTF8StringEncoding];
-        uint8_t deviceHeader[] = {0x04}; // OCTET STRING
-        [nacRequest appendBytes:deviceHeader length:sizeof(deviceHeader)];
-        uint8_t deviceLen = (uint8_t)deviceIdData.length;
-        [nacRequest appendBytes:&deviceLen length:sizeof(deviceLen)];
-        [nacRequest appendData:deviceIdData];
-        
-        // Update the length field
-        uint16_t totalLength = htons((uint16_t)(nacRequest.length - 4)); // Subtract header and length bytes
-        [nacRequest replaceBytesInRange:NSMakeRange(lengthOffset, sizeof(lengthPlaceholder)) 
-                              withBytes:&totalLength length:sizeof(totalLength)];
+        // Add a timestamp for uniqueness
+        uint64_t timestamp = (uint64_t)time(NULL);
+        timestamp = ((uint64_t)htonl(timestamp & 0xFFFFFFFF) << 32) | htonl(timestamp >> 32);
+        [nacRequest appendBytes:&timestamp length:sizeof(timestamp)];
         
         // Step 6: Create validation context containing the keys and signature
         NSMutableDictionary *validationContext = [NSMutableDictionary dictionary];
